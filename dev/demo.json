@@ -1,0 +1,9 @@
+{
+  "captured_at": "Demo data — not a real home",
+  "states": [
+    {"entity_id":"weather.home","state":"cloudy","attributes":{"friendly_name":"Home weather","temperature":18.5}},
+    {"entity_id":"climate.study","state":"heat","attributes":{"friendly_name":"Study thermostat","temperature":21,"current_temperature":19.4}},
+    {"entity_id":"sensor.outdoor_temperature","state":"18.5","attributes":{"friendly_name":"Outdoor temperature","unit_of_measurement":"°C"}},
+    {"entity_id":"light.study","state":"on","attributes":{"friendly_name":"Study lights"}}
+  ]
+}

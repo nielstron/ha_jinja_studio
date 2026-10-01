@@ -1,0 +1,45 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width,initial-scale=1">
+  <title>Jinja Studio · Local preview</title>
+  <style>html,body{height:100%;margin:0}jinja-studio-panel{display:block;height:100%}</style>
+</head>
+<body>
+  <jinja-studio-panel></jinja-studio-panel>
+  <script type="module">
+    import '/jinja_studio_static/panel.js';
+    const demo = new URLSearchParams(location.search).has('demo');
+    const snapshot = await fetch(demo?'/api/demo':'/api/states').then(r=>r.json());
+    const request = async (url,body) => {
+      const response = await fetch(url,{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify(body)});
+      const data = await response.json();
+      if(!response.ok)throw new Error(data.error);
+      return data;
+    };
+    document.querySelector('jinja-studio-panel').hass = {
+      states:Object.fromEntries(snapshot.states.map(s=>[s.entity_id,s])),
+      user:{id:demo?'demo':'local',name:'Local preview',is_admin:true},
+      templateBuilderSnapshot:true,
+      templateBuilderDemo:demo,
+      callWS:async message=>{
+        if(message.type==='get_services'){
+          const response=await fetch('/api/services'),data=await response.json();
+          if(!response.ok)throw new Error(data.error);
+          return data;
+        }
+        return request(message.type==='call_service'?'/api/action-sample':'/api/projects',message);
+      },
+      connection:{subscribeMessage:async(callback,message)=>{
+        const controller=new AbortController();
+        const response=await fetch('/api/render',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({template:message.template,variables:message.variables,demo}),signal:controller.signal});
+        const data=await response.json();
+        if(!response.ok)throw new Error(data.error);
+        callback(data);
+        return ()=>controller.abort();
+      }},
+    };
+  </script>
+</body>
+</html>

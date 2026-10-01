@@ -1,0 +1,12 @@
+{
+  "title": "Jinja Studio",
+  "config": {
+    "step": {
+      "user": {
+        "title": "Jinja Studio",
+        "description": "Add a Blockly editor for Home Assistant templates. Build with entity pickers, maths, strings, conditions and loops, and preview the result live."
+      }
+    },
+    "abort": {"already_configured": "The template builder is already configured."}
+  }
+}
