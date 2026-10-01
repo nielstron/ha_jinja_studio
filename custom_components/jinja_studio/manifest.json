@@ -1,14 +1,14 @@
 {
   "domain": "jinja_studio",
   "name": "Jinja Studio",
-  "version": "0.1.0",
-  "documentation": "https://github.com/nielstron/ha_jinja_studio",
-  "issue_tracker": "https://github.com/nielstron/ha_jinja_studio/issues",
-  "single_config_entry": true,
+  "codeowners": ["@nielstron"],
   "config_flow": true,
   "dependencies": ["http", "frontend", "panel_custom", "websocket_api"],
-  "codeowners": ["@nielstron"],
-  "requirements": [],
+  "documentation": "https://github.com/nielstron/ha_jinja_studio",
   "integration_type": "service",
-  "iot_class": "local_push"
+  "iot_class": "local_push",
+  "issue_tracker": "https://github.com/nielstron/ha_jinja_studio/issues",
+  "requirements": [],
+  "single_config_entry": true,
+  "version": "0.1.0"
 }
