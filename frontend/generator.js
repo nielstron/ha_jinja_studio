@@ -104,7 +104,8 @@ f.math_number_property = (b,g) => {
     g.helpers.prime=tag('macro _tb_prime(n)')+tag('set q = namespace(prime=n is number and n == (n | int) and n >= 2)')+tag('if q.prime')+tag('for d in range(2, ((n ** 0.5) | int) + 1)')+tag('if n % d == 0')+tag('set q.prime = false')+tag('endif')+tag('endfor')+tag('endif')+'{{ "true" if q.prime else "false" }}'+tag('endmacro');
     return expr(`_tb_prime(${n}) == "true"`);
   }
-  return expr({EVEN:`${n} % 2 == 0`,ODD:`${n} % 2 != 0`,WHOLE:`${n} % 1 == 0`,POSITIVE:`${n} > 0`,NEGATIVE:`${n} < 0`,DIVISIBLE_BY:`${n} % ${group(b,g,'DIVISOR','1')} == 0`}[b.getFieldValue('PROPERTY')]);
+  if(b.getFieldValue('PROPERTY')==='DIVISIBLE_BY')return expr(`${n} % ${group(b,g,'DIVISOR','1')} == 0`);
+  return expr({EVEN:`${n} % 2 == 0`,ODD:`${n} % 2 != 0`,WHOLE:`${n} % 1 == 0`,POSITIVE:`${n} > 0`,NEGATIVE:`${n} < 0`}[b.getFieldValue('PROPERTY')]);
 };
 f.math_on_list = (b,g) => {
   const list=group(b,g,'LIST','[]'), op=b.getFieldValue('OP');
