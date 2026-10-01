@@ -9,7 +9,7 @@ from homeassistant.helpers.storage import Store
 
 DOMAIN = "jinja_studio"
 PANEL = "jinja-studio"
-MODULE_URL = "/jinja_studio_static/tools-tab.js?v=0.1.0"
+MODULE_URL = "/jinja_studio_static/tools-tab.js?v=0.1.1"
 
 
 async def async_setup_entry(hass, entry):
@@ -36,7 +36,7 @@ async def async_setup_entry(hass, entry):
         "jinja-studio-panel",
         sidebar_title=None,
         sidebar_icon="mdi:puzzle-outline",
-        module_url="/jinja_studio_static/panel.js?v=0.1.0",
+        module_url="/jinja_studio_static/panel.js?v=0.1.1",
         require_admin=True,
     )
     frontend.add_extra_js_url(hass, MODULE_URL)
@@ -62,8 +62,8 @@ async def async_unload_entry(hass, entry):
         },
     }
 )
-@websocket_api.async_response
 @websocket_api.require_admin
+@websocket_api.async_response
 async def websocket_projects(hass, connection, msg):
     """Read and edit explicitly saved Blockly workspaces."""
     data = hass.data[DOMAIN]

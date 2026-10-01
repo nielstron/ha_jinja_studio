@@ -1,7 +1,7 @@
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
 import { spawnSync } from 'node:child_process';
-import { BlocklyCore as Blockly } from '../frontend/blocks.js';
+import { BlocklyCore as Blockly, setFieldPicker } from '../frontend/blocks.js';
 import { generate } from '../frontend/generator.js';
 import { applyAttributePath } from '../frontend/attribute-path.js';
 import { actionConfig, actionSignature, actionInputs, responseVariables, requiredActions } from '../frontend/action-response.js';
@@ -9,6 +9,17 @@ import { actionConfig, actionSignature, actionInputs, responseVariables, require
 const sample={'weather.home':{forecast:[{temperature:21.5},{temperature:18}]}};
 const key=value=>({kind:'key',value});
 const index=value=>({kind:'index',value});
+test('clicking the action name opens the action picker instead of a text editor',()=>{
+  const workspace=new Blockly.Workspace();
+  let selected;
+  setFieldPicker((field,kind)=>{selected={field,kind};});
+  try {
+    const field=workspace.newBlock('ha_action_response').getField('ACTION');
+    field.showEditor_();
+    assert.equal(selected.kind,'action');
+    assert.equal(selected.field,field);
+  } finally {setFieldPicker(null);workspace.dispose();}
+});
 function setup() {
   const workspace=new Blockly.Workspace();
   const root=workspace.newBlock('ha_action_response');

@@ -26,7 +26,7 @@ class TemplateBuilderPanel extends HTMLElement {
         .data-nav{display:flex;align-items:center;gap:5px;flex-wrap:wrap;padding:0 20px 12px}.data-nav button{padding:5px 8px;font-size:12px;border:0;background:var(--secondary-background-color,#edf4f1)}.data-nav .path-separator{color:#829391}.data-selection{margin:0 20px 12px;padding:12px;background:var(--secondary-background-color,#eff5f3);border-radius:9px;display:flex;gap:10px;align-items:center;justify-content:space-between}.data-selection small{display:block;color:var(--secondary-text-color,#748685);font-size:11px;margin-top:3px}.data-row{display:flex;align-items:center;border-radius:9px;margin:3px 0}.data-row:hover{background:var(--secondary-background-color,#edf4f3)}.data-row .entity-result{min-width:0}.data-row .entity-result>span:first-child{overflow-wrap:anywhere}.data-row .use-data{flex-shrink:0;padding:7px 9px;margin-right:8px;font-size:12px}.browse-arrow{color:#147d78;font-size:20px;flex-shrink:0}.data-row .state{max-width:220px}
       </style>
       <div class="shell">
-        <header class="header"><div class="headline"><div><div class="eyebrow">Visual template builder</div><h1>Jinja Studio</h1><p class="subtitle">Compose with blocks. Use the result anywhere in Home Assistant.</p></div><span class="badge" id="source">Home Assistant</span></div>
+        <header class="header">
         <div class="toolbar"><select id="projects" aria-label="Saved projects"><option value="">Saved templates…</option></select><input id="name" aria-label="Template name" placeholder="Untitled template" value="My template"><span class="save-status" id="saved">Unsaved</span><button id="save" class="primary">Save</button><button id="new">New</button><span class="spacer"></span><select id="examples" aria-label="Examples"><option value="">Try an example…</option></select><button id="import">Import</button><button id="export">Export</button><input id="file" type="file" accept=".json" class="hidden"></div></header>
         <div class="content"><section class="canvas-card"><div class="canvas-tools"><span>Drag blocks together · Click an entity to select it</span><div><button id="undo" title="Undo">↶</button><button id="redo" title="Redo">↷</button><button id="fit" title="Fit blocks">⤢</button></div></div><div id="workspace" class="workspace"></div></section>
         <aside class="sidebar"><section class="card"><div class="card-title"><span>Live result</span><span id="render-status"><span class="status-dot"></span>Ready</span></div><pre id="preview" class="preview empty">Connect a block to an output to get started.</pre></section><section class="card code-card"><div class="card-title"><span>Generated Jinja</span><button id="copy">Copy template</button></div><pre id="code" class="code"></pre></section><section class="card hint"><strong>Your building blocks</strong><br>Use <strong>Home Assistant</strong> for entity inputs, <strong>Logic</strong> and <strong>Loops</strong> for structure, and <strong>Maths</strong> or <strong>Text & lists</strong> for transformations.<br><br><strong>Need another Jinja feature?</strong> Chain a named filter or add a raw expression or statement block.</section></aside></div><div class="footer" id="footer">Preview evaluates your template. It does not run scripts or change entities.</div>
@@ -134,10 +134,9 @@ class TemplateBuilderPanel extends HTMLElement {
     window.addEventListener('beforeunload',this.beforeUnload);
     window.addEventListener('keydown',this.keydown);
     if(this.hass.templateBuilderSnapshot){
-      this.$('source').textContent=`Snapshot · ${Object.keys(this.hass.states).length} entities`;
       this.$('footer').textContent='Local preview uses a saved state snapshot and a Jinja sandbox. HA-specific behaviour is checked against HA before deployment.';
     }
-    if(this.hass.templateBuilderDemo){this.$('source').textContent='Demo data · local preview';this.$('footer').textContent='Demonstration entities and forecast samples. No real home data or device actions.';}
+    if(this.hass.templateBuilderDemo){this.$('footer').textContent='Demonstration entities and forecast samples. No real home data or device actions.';}
     this.projects=await this.hass.callWS({type:'jinja_studio/projects',action:'list'});
     this.renderProjects();
     const draft=JSON.parse(localStorage.getItem(this.draftKey())||localStorage.getItem(`template_builder_draft_${this.hass.user?.id||'local'}`)||'null');
@@ -205,6 +204,7 @@ class TemplateBuilderPanel extends HTMLElement {
     catch(e){this.load(previous);this.toast(`Import failed: ${e.message}`);}
   }
   openPicker(field,kind) {
+    if(kind==='action'){this.openActionInput(field.getSourceBlock());this.openActionPicker();return;}
     if(kind==='response'){this.openActionInput(field.getSourceBlock());return;}
     if(kind==='icon'){this.openIconPicker(field);return;}
     if(kind==='color'){this.openColorPicker(field);return;}

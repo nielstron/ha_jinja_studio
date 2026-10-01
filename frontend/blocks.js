@@ -42,6 +42,10 @@ class ResponseField extends Blockly.FieldTextInput {
   showEditor_() { selectField?.(this, 'response'); }
   static fromJson() { return new ResponseField('Configure / browse…'); }
 }
+class ActionField extends Blockly.FieldTextInput {
+  showEditor_() { selectField?.(this, 'action'); }
+  static fromJson(options) { return new ActionField(options.text || 'weather.get_forecasts'); }
+}
 class IconField extends Blockly.FieldTextInput {
   showEditor_() { selectField?.(this, 'icon'); }
   static fromJson(options) { return new IconField(options.text || 'mdi:lightbulb'); }
@@ -54,6 +58,7 @@ Blockly.fieldRegistry.register('field_ha_entity', EntityField);
 Blockly.fieldRegistry.register('field_ha_state', StateField);
 Blockly.fieldRegistry.register('field_ha_attribute', AttributeField);
 Blockly.fieldRegistry.register('field_ha_response', ResponseField);
+Blockly.fieldRegistry.register('field_ha_action', ActionField);
 Blockly.fieldRegistry.register('field_tb_icon', IconField);
 Blockly.fieldRegistry.register('field_tb_color', ColorField);
 
@@ -68,7 +73,7 @@ Blockly.defineBlocksWithJsonArray([
   expression('ha_state', 'state of %1', [entity], 190, 'Select an entity by its name, domain or ID. States are strings; use the number block for maths.'),
   expression('ha_number', 'number from %1 default %2', [entity, {type:'field_number', name:'DEFAULT', value:0}], 190, 'Convert an entity state to a number, with a fallback for unavailable/non-numeric values.'),
   expression('ha_attribute', '%1 attribute %2', [entity, {type:'field_ha_attribute',name:'ATTRIBUTE',text:'friendly_name'}], 190),
-  {type:'ha_action_response',message0:'action %1',args0:[text('ACTION','weather.get_forecasts')],message1:'on %1',args1:[entity],message2:'response %1 %2',args2:[text('RESPONSE','forecasts'),{type:'field_ha_response',name:'PICKER'}],output:null,colour:190,inputsInline:false,tooltip:'Configure an action, explicitly fetch a sample, and browse its response. Copy the required action YAML alongside your template.'},
+  {type:'ha_action_response',message0:'action %1',args0:[{type:'field_ha_action',name:'ACTION',text:'weather.get_forecasts'}],message1:'on %1',args1:[entity],message2:'response %1 %2',args2:[text('RESPONSE','forecasts'),{type:'field_ha_response',name:'PICKER'}],output:null,colour:190,inputsInline:false,tooltip:'Click the action name to choose an available action. Configure an action, explicitly fetch a sample, and browse its response. Copy the required action YAML alongside your template.'},
   expression('ha_is_state', '%1 is %2', [entity, {type:'field_ha_state',name:'STATE',text:'on'}], 190, 'Entity and state pickers. Returns true or false.'),
   expression('ha_has_value', '%1 is available', [entity], 190),
   expression('ha_dynamic_state', 'state of entity ID %1', [value('ENTITY')], 190),
