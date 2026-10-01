@@ -81,6 +81,60 @@ test('slice, dict, arbitrary filters and generic functions produce native Jinja'
   assert.equal(render([output({type:'tb_call',fields:{FUNCTION:'range'},inputs:inputs({ARGS:raw('[1,4]')})})]),'range(1, 4)');
 });
 
+test('lazy filters produce usable lists rather than generator representations',()=>{
+  const filter=(name,value,args='')=>({type:'tb_filter',fields:{FILTER:name,ARGS:args},inputs:inputs({VALUE:raw(value)})});
+  for(const [name,value,args,expected] of [
+    ['map','["1", "2"]','"int"','[1, 2]'],
+    ['select','[1, 2, 3]','"odd"','[1, 3]'],
+    ['reject','[1, 2, 3]','"odd"','[2]'],
+    ['selectattr','[{"x": 1}, {"x": 2}]','"x", "equalto", 2',"[{'x': 2}]"],
+    ['rejectattr','[{"x": 1}, {"x": 2}]','"x", "equalto", 2',"[{'x': 1}]"],
+    ['unique','[1, 1, 2]','','[1, 2]'],
+    ['batch','[1, 2, 3]','2','[[1, 2], [3]]'],
+    ['slice','[1, 2, 3, 4]','2','[[1, 2], [3, 4]]'],
+  ])assert.equal(render([output(filter(name,value,args))]),expected,name);
+});
+
+test('map composes existing unary filters and attribute operations without duplicate operators',()=>{
+  const map=(list,op)=>({type:'tb_map',inputs:inputs({LIST:raw(list),OP:op})});
+  assert.equal(render([output(map('["hello", "world"]',{type:'tb_filter',fields:{FILTER:'upper'}}))]),"['HELLO', 'WORLD']");
+  assert.equal(render([output(map('[{"x": 2}, {"x": 4}]',{type:'tb_property',fields:{KEY:'x'}}))]),'[2, 4]');
+  assert.equal(render([output(map('[1.234, 2.345]',{type:'math_round',fields:{OP:'ROUND',PRECISION:1}}))]),'[1.2, 2.3]');
+});
+
+test('filter composes boolean predicates and map/filter remain native values in a chain',()=>{
+  const map={type:'tb_map',inputs:inputs({LIST:raw('[1, 2, 3]'),OP:{type:'math_arithmetic',fields:{OP:'MULTIPLY'},inputs:inputs({A:{type:'tb_item'},B:n(2)})}})};
+  const predicate={type:'logic_compare',fields:{OP:'GT'},inputs:inputs({A:{type:'tb_item'},B:n(2)})};
+  assert.equal(render([output({type:'tb_filter_list',inputs:inputs({LIST:map,PREDICATE:predicate})})]),'[4, 6]');
+  assert.equal(render([output({type:'tb_filter_list',inputs:inputs({LIST:raw('[1, 2, 3, 4]'),PREDICATE:{type:'math_number_property',fields:{PROPERTY:'EVEN'}}})})]),'[2, 4]');
+  const states={type:'ha_entities',fields:{DOMAIN:'light'}};
+  const on={type:'logic_compare',fields:{OP:'EQ'},inputs:inputs({A:{type:'tb_property',fields:{KEY:'state'}},B:text('on')})};
+  const filtered={type:'tb_filter_list',inputs:inputs({LIST:states,PREDICATE:on})};
+  assert.equal(render([output({type:'tb_map',inputs:inputs({LIST:filtered,OP:{type:'tb_property',fields:{KEY:'entity_id'}}})})]),"['light.study']");
+});
+
+test('nested maps scope current item and collection prerequisites execute inside loops',()=>{
+  const inner={type:'tb_map',inputs:inputs({LIST:{type:'tb_item'},OP:{type:'math_single',fields:{OP:'ABS'}}})};
+  assert.equal(render([output({type:'tb_map',inputs:inputs({LIST:raw('[[-1, 2], [-3]]'),OP:inner})})]),'[[1, 2], [3]]');
+  const item={id:'list-id',name:'xs'};
+  const mapped={type:'tb_map',inputs:inputs({LIST:{type:'variables_get',fields:{VAR:item}},OP:{type:'math_single',fields:{OP:'ABS'}}})};
+  const loop={type:'controls_forEach',fields:{VAR:item},inputs:inputs({LIST:raw('[[-1], [-2]]'),DO:output(mapped)})};
+  assert.equal(render([loop],[item]),'[1][2]');
+});
+
+test('collection-building in an elif condition stays lazy and in the correct branch',()=>{
+  const unsafe={type:'tb_map',inputs:inputs({LIST:raw('undefined_list'),OP:{type:'tb_item'}})};
+  const block={type:'controls_if',extraState:{elseIfCount:1},inputs:inputs({IF0:{type:'logic_boolean',fields:{BOOL:'TRUE'}},DO0:output(text('ok')),IF1:{type:'logic_compare',fields:{OP:'GT'},inputs:inputs({A:{type:'lists_length',inputs:inputs({VALUE:unsafe})},B:n(0)})},DO1:output(text('bad'))})};
+  assert.equal(render([block]),'ok');
+});
+
+test('maps inside conditional expressions and boolean operations preserve short-circuit evaluation',()=>{
+  const unsafe={type:'tb_map',inputs:inputs({LIST:raw('undefined_list'),OP:{type:'tb_item'}})};
+  assert.equal(render([output({type:'logic_ternary',inputs:inputs({IF:{type:'logic_boolean',fields:{BOOL:'TRUE'}},THEN:text('ok'),ELSE:unsafe})})]),'ok');
+  const unsafeTest={type:'tb_test',fields:{TEST:'iterable'},inputs:inputs({VALUE:unsafe})};
+  assert.equal(render([output({type:'logic_operation',fields:{OP:'OR'},inputs:inputs({A:{type:'logic_boolean',fields:{BOOL:'TRUE'}},B:unsafeTest})})]),'True');
+});
+
 test('all shipped examples compile and render against HA-like states',()=>{
   for(const create of Object.values(examples)) {
     const data=create(snapshot.states);

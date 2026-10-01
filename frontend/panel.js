@@ -5,6 +5,8 @@ import { attributeChildren, applyAttributePath, resolveAttributePath, valueSumma
 import { actionConfig, actionSignature, actionInputs, responseVariables, requiredActions } from './action-response.js';
 import { actionCatalog, filterActions, actionFields, actionDefaults } from './action-catalog.js';
 import { iconName, hexColor, colorRgb, searchIcons, colorPalette } from './visual-values.js';
+import {CursorDragger,configureDeletion} from './interactions.js';
+import {FilterEditor} from './filter-editor.js';
 
 const escape = s => String(s).replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
 
@@ -32,6 +34,7 @@ class TemplateBuilderPanel extends HTMLElement {
         <aside class="sidebar"><section class="card"><div class="card-title"><span>Live result</span><span id="render-status"><span class="status-dot"></span>Ready</span></div><pre id="preview" class="preview empty">Connect a block to an output to get started.</pre></section><section class="card code-card"><div class="card-title"><span>Generated Jinja</span><button id="copy">Copy template</button></div><pre id="code" class="code"></pre></section><section class="card hint"><strong>Your building blocks</strong><br>Use <strong>Home Assistant</strong> for entity inputs, <strong>Logic</strong> and <strong>Loops</strong> for structure, and <strong>Maths</strong> or <strong>Text & lists</strong> for transformations.<br><br><strong>Need another Jinja feature?</strong> Chain a named filter or add a raw expression or statement block.</section></aside></div><div class="footer" id="footer">Preview evaluates your template. It does not run scripts or change entities.</div>
       </div><dialog id="picker"><div class="dialog-head"><h2 id="picker-title">Choose an entity</h2><button id="close-picker" aria-label="Close">✕</button></div><div class="search"><input id="search" placeholder="Search names, entity IDs or states…" aria-label="Search entities"><select id="domain" aria-label="Entity domain"><option value="">All domains</option></select></div><nav id="data-nav" class="data-nav hidden" aria-label="Attribute path"></nav><div id="data-selection" class="data-selection hidden"></div><div id="results" class="results"></div><div class="dialog-foot" id="picker-help">Select an entity to use its state as an input.</div></dialog><div id="toast" class="toast hidden" role="status"></div>`;
     this.$ = id => this.shadowRoot.getElementById(id);
+    this.filterEditor=new FilterEditor(this);
     this.$('code').closest('section').insertAdjacentHTML('afterend', `<section id="actions-card" class="card hidden"><div class="card-title"><span>Required actions · YAML</span><button id="copy-actions">Copy actions</button></div><pre id="actions-code" class="code"></pre><div class="hint">Run these actions <strong>before</strong> using the Jinja in your script or automation. A standalone template helper cannot run actions. Preview uses your saved sample; it never reruns an action automatically.</div></section>`);
     const actionUI=document.createElement('template');
     actionUI.innerHTML=`<style>.action-form{padding:16px 20px;display:grid;gap:12px;max-height:65vh;overflow:auto}.action-form label{display:grid;gap:5px;font-size:12px}.action-form input,.action-form select,.action-form textarea{width:100%;padding:9px;border:1px solid #d4dfde;border-radius:8px;background:inherit;color:inherit;font:13px system-ui}.action-form textarea{font:12px ui-monospace,monospace;resize:vertical}.action-buttons{display:flex;gap:8px;flex-wrap:wrap}.action-message{white-space:pre-wrap;color:#b64747;font-size:12px}.action-form small{color:#748685;line-height:1.5}</style><dialog id="action-dialog"><div class="dialog-head"><h2>Action response input</h2><button id="close-action" aria-label="Close action input">✕</button></div><div class="action-form"><label>Action<input id="action-name" placeholder="weather.get_forecasts" list="response-actions"><datalist id="response-actions"><option value="weather.get_forecasts"><option value="calendar.get_events"></datalist></label><label>Target entity<select id="action-entity"></select></label><label>Action data · JSON<textarea id="action-data" rows="3"></textarea></label><label>Response variable<input id="action-variable" placeholder="forecasts"></label><div class="action-buttons"><button id="fetch-response">Run action & fetch sample</button></div><small id="action-warning">Fetching explicitly runs this action in Home Assistant. Choose a read-only action; other actions may change devices. Nothing runs automatically.</small><label>Sample response · JSON<textarea id="action-sample" rows="5" placeholder="Fetch a sample, or paste response JSON here"></textarea></label><div id="action-message" class="action-message" role="status"></div><div class="action-buttons"><button id="browse-response" class="primary">Save & browse response</button><button id="save-response">Save input</button></div></div></dialog>`;
@@ -77,13 +80,15 @@ class TemplateBuilderPanel extends HTMLElement {
     this.workspace = Blockly.inject(this.$('workspace'), {
       toolbox,
       renderer:'zelos',
+      plugins:{blockDragger:CursorDragger},
       media:'/jinja_studio_static/media/',
-      grid:{spacing:24,length:2,colour:'#d4e2de',snap:true},
+      grid:{spacing:24,length:2,colour:'#d4e2de',snap:false},
       zoom:{controls:true,wheel:true,startScale:.85,minScale:.35,maxScale:1.5},
       move:{scrollbars:true,drag:true,wheel:true},
       trashcan:true,
       theme:Blockly.Theme.defineTheme('studio',{base:Blockly.Themes.Classic,componentStyles:{workspaceBackgroundColour:'#f9fbfa',toolboxBackgroundColour:'#fff',toolboxForegroundColour:'#34504e',flyoutBackgroundColour:'#eef4f1',flyoutForegroundColour:'#385450',flyoutOpacity:1,scrollbarColour:'#b3cbc2',insertionMarkerColour:'#147d78',insertionMarkerOpacity:.3}}),
     });
+    configureDeletion(this.workspace);
     this.resizeObserver = new ResizeObserver(()=>Blockly.svgResize(this.workspace));
     this.resizeObserver.observe(this.$('workspace'));
     this.workspace.addChangeListener(event=>{
@@ -204,6 +209,7 @@ class TemplateBuilderPanel extends HTMLElement {
     catch(e){this.load(previous);this.toast(`Import failed: ${e.message}`);}
   }
   openPicker(field,kind) {
+    if(kind==='filter'){this.filterEditor.open(field.getSourceBlock());return;}
     if(kind==='action'){this.openActionInput(field.getSourceBlock());this.openActionPicker();return;}
     if(kind==='response'){this.openActionInput(field.getSourceBlock());return;}
     if(kind==='icon'){this.openIconPicker(field);return;}

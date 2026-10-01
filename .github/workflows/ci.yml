@@ -14,6 +14,7 @@ jobs:
       - run: uv sync --group dev
       - run: npm ci
       - run: npm test
+      - run: uv run --group dev python -m pytest tests/test_filter_catalog.py
       - run: npm run build
       - run: git diff --exit-code -- custom_components/jinja_studio/frontend
       - run: uv run --group dev ruff check custom_components dev

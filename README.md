@@ -85,8 +85,25 @@ when referenced entities change.
   prime checks and list statistics.
 - Strings, replacement, splitting, joining, slicing, lists, indexing,
   dictionaries and property access.
+- Composable **Map list** and **Filter list** blocks with operation/predicate
+  sockets: reuse the same attribute, string, maths and logic blocks for each
+  item. Use **Current item** explicitly, or leave a unary operation's value
+  socket empty to use it implicitly. Nested maps/filters keep their own item
+  scope. Generated templates use native Jinja loops and lists, retaining HA
+  state objects rather than converting through JSON.
 - Any named Jinja/HA filter, test or function, plus raw expression and raw
   statement blocks for features without a dedicated visual block.
+  Click a filter name or its options to see actual registered signatures,
+  named arguments and defaults, typed values, attribute/test choices and the
+  two built-in `map` modes. Lazy filters such as `map` and `selectattr` are
+  materialized as lists instead of displaying generator objects.
+
+Drag insertion follows the cursor rather than the dragged block's connector.
+Only dropping the cursor inside the visible trash can deletes blocks; dropping
+onto the toolbox returns the block to its starting position. Undo can restore
+deleted blocks.
+
+![Composed map and filter operations](docs/composition.png)
 
 Raw blocks are escape hatches, not a reverse parser. Existing arbitrary Jinja
 cannot automatically be converted into blocks. Save/export the workspace to

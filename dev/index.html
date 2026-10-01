@@ -24,6 +24,7 @@
       templateBuilderSnapshot:true,
       templateBuilderDemo:demo,
       callWS:async message=>{
+        if(message.type==='jinja_studio/filters')return fetch('/api/filters').then(r=>r.json());
         if(message.type==='get_services'){
           const response=await fetch('/api/services'),data=await response.json();
           if(!response.ok)throw new Error(data.error);

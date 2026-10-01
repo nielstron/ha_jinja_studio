@@ -6,6 +6,15 @@ const workspace = (blocks,variables=[]) => ({blocks:{languageVersion:0,blocks:bl
 const whenLightOn=(entities,yes,no)=>({type:'logic_ternary',inputs:{IF:{block:{type:'ha_is_state',fields:{ENTITY:entities.find(e=>e.entity_id.startsWith('light.'))?.entity_id||'light.living_room',STATE:'on'}}},THEN:{block:yes},ELSE:{block:no}}});
 
 export const examples = {
+  'Compose map & filter': () => {
+    const item=()=>({type:'tb_item'});
+    const property=key=>({type:'tb_property',fields:{KEY:key},inputs:{VALUE:{block:item()}}});
+    const input={type:'tb_raw_expression',fields:{CODE:'[{"name": "Study", "temperature": 21.234}, {"name": "Bedroom", "temperature": 18.456}]'}};
+    const cold={type:'logic_compare',fields:{OP:'LT'},inputs:{A:{block:property('temperature')},B:{block:num(20)}}};
+    const selected={type:'tb_filter_list',inputs:{LIST:{block:input},PREDICATE:{block:cold}}};
+    const round={type:'math_round',fields:{OP:'ROUND',PRECISION:1},inputs:{NUM:{block:property('temperature')}}};
+    return workspace([output({type:'tb_map',inputs:{LIST:{block:selected},OP:{block:round}}})]);
+  },
   'Forecast-aware heating (demo)': entities => {
     const weather=entities.find(e=>e.entity_id.startsWith('weather.'))?.entity_id||'weather.home';
     const thermostat=entities.find(e=>e.entity_id.startsWith('climate.') && typeof e.attributes.temperature==='number')?.entity_id||'climate.study';

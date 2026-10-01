@@ -11,8 +11,19 @@ const quote = value => JSON.stringify(String(value));
 const expr = code => [code, ATOMIC];
 const tag = code => `{%- ${code} -%}\n`;
 const variable = (b,g) => 'ns.' + g.nameDB_.getName(b.getFieldValue('VAR'), Blockly.Names.NameType.VARIABLE);
-const input = (b,g,name,fallback='none') => g.valueToCode(b,name,NONE) || fallback;
+const unaryInputs = {tb_filter:'VALUE',tb_test:'VALUE',tb_property:'VALUE',tb_index:'VALUE',tb_slice:'VALUE',tb_replace:'VALUE',tb_split:'VALUE',tb_join:'VALUE',lists_length:'VALUE',text_length:'VALUE',lists_isEmpty:'VALUE',text_isEmpty:'VALUE',math_round:'NUM',math_single:'NUM',math_trig:'NUM',math_number_property:'NUMBER_TO_CHECK',math_on_list:'LIST',ha_dynamic_state:'ENTITY',logic_negate:'BOOL'};
+const input = (b,g,name,fallback='none') => g.valueToCode(b,name,NONE) || (g.currentItem && unaryInputs[b.type]===name?g.currentItem:fallback);
 const group = (b,g,name,fallback='none') => `(${input(b,g,name,fallback)})`;
+const lazyFilters = new Set(['map','select','reject','selectattr','rejectattr','unique','batch','slice']);
+const temporary = (b,g) => {
+  if(!g.temporaryNames.has(b.id))g.temporaryNames.set(b.id,g.temporaryNames.size+1);
+  return g.temporaryNames.get(b.id);
+};
+function evaluate(g,callback) {
+  const parent=g.pending;g.pending=[];
+  try {const code=callback();return {code,pending:g.pending.join('')};}
+  finally {g.pending=parent;}
+}
 
 jinja.init = function(workspace) {
   this.nameDB_ = new Blockly.Names('ns,true,false,none,loop,for,if,else,range,dict,set,macro,namespace');
@@ -21,12 +32,15 @@ jinja.init = function(workspace) {
   this.variables.forEach(v => this.nameDB_.getName(v.getId(),Blockly.Names.NameType.VARIABLE));
   this.isInitialized = true;
   this.helpers = {};
+  this.pending = [];
+  this.currentItem = null;
+  this.temporaryNames = new Map();
 };
 jinja.finish = function(code) {
   const names = this.variables.map(v=>this.nameDB_.getName(v.getId(),Blockly.Names.NameType.VARIABLE));
   return Object.values(this.helpers).join('') + (names.length ? tag(`set ns = namespace(${names.map(n=>`${n}=none`).join(', ')})`) : '') + code;
 };
-jinja.scrubNakedValue = code => `{{ ${code} }}`;
+jinja.scrubNakedValue = function(code) {const pending=this.pending.join('');this.pending=[];return pending+`{{ ${code} }}`;};
 jinja.scrub_ = function(b,code,thisOnly) { return code + (thisOnly ? '' : this.blockToCode(b.nextConnection?.targetBlock())); };
 
 const f = jinja.forBlock;
@@ -34,14 +48,43 @@ f.tb_output = (b,g) => `{{ ${input(b,g,'VALUE','""')} }}`;
 f.tb_literal = b => `{{ ${quote(b.getFieldValue('TEXT'))} }}`;
 f.tb_icon = b => expr(quote(iconName(b.getFieldValue('ICON'))));
 f.tb_color = b => expr(b.getFieldValue('FORMAT')==='rgb'?JSON.stringify(colorRgb(b.getFieldValue('COLOR'))):quote(hexColor(b.getFieldValue('COLOR'))));
+f.tb_item = (b,g) => {if(!g.currentItem)throw Error('Current item must be inside a map/filter operation.');return expr(g.currentItem);};
+function collection(b,g,isFilter) {
+  const list=input(b,g,'LIST','[]'),suffix=temporary(b,g);
+  const item=`_tb_item_${suffix}`,result=`_tb_list_${suffix}`;
+  const parentItem=g.currentItem,parentPending=g.pending;
+  let operation,body;
+  g.currentItem=item;g.pending=[];
+  try {operation=input(b,g,isFilter?'PREDICATE':'OP',isFilter?'true':item);body=g.pending.join('');}
+  finally {g.currentItem=parentItem;g.pending=parentPending;}
+  g.pending.push(tag(`set ${result} = namespace(items=[])`)+tag(`for ${item} in ${list}`)+body+
+    (isFilter?tag(`if ${operation}`):'')+tag(`set ${result}.items = ${result}.items + [${isFilter?item:operation}]`)+
+    (isFilter?tag('endif'):'')+tag('endfor'));
+  return expr(`${result}.items`);
+}
+f.tb_map = (b,g) => collection(b,g,false);
+f.tb_filter_list = (b,g) => collection(b,g,true);
 f.text = b => expr(quote(b.getFieldValue('TEXT')));
 f.math_number = b => expr(String(b.getFieldValue('NUM')));
 f.logic_boolean = b => expr(b.getFieldValue('BOOL')==='TRUE'?'true':'false');
 f.logic_null = () => expr('none');
 f.logic_compare = (b,g) => expr(`${group(b,g,'A')} ${{EQ:'==',NEQ:'!=',LT:'<',LTE:'<=',GT:'>',GTE:'>='}[b.getFieldValue('OP')]} ${group(b,g,'B')}`);
-f.logic_operation = (b,g) => expr(`${group(b,g,'A','false')} ${b.getFieldValue('OP')==='AND'?'and':'or'} ${group(b,g,'B','false')}`);
+f.logic_operation = (b,g) => {
+  const a=evaluate(g,()=>group(b,g,'A','false')),right=evaluate(g,()=>group(b,g,'B','false')),and=b.getFieldValue('OP')==='AND';
+  if(!right.pending){g.pending.push(a.pending);return expr(`${a.code} ${and?'and':'or'} ${right.code}`);}
+  const name=`_tb_bool_${temporary(b,g)}`;
+  g.pending.push(a.pending+tag(`set ${name} = namespace(value=${a.code})`)+tag(`if ${and?'':'not '}${name}.value`)+right.pending+tag(`set ${name}.value = ${right.code}`)+tag('endif'));
+  return expr(`${name}.value`);
+};
 f.logic_negate = (b,g) => expr(`not ${group(b,g,'BOOL','false')}`);
-f.logic_ternary = (b,g) => expr(`${group(b,g,'THEN')} if ${group(b,g,'IF','false')} else ${group(b,g,'ELSE')}`);
+f.logic_ternary = (b,g) => {
+  const condition=evaluate(g,()=>group(b,g,'IF','false')),yes=evaluate(g,()=>group(b,g,'THEN')),no=evaluate(g,()=>group(b,g,'ELSE'));
+  g.pending.push(condition.pending);
+  if(!yes.pending&&!no.pending)return expr(`${yes.code} if ${condition.code} else ${no.code}`);
+  const name=`_tb_choice_${temporary(b,g)}`;
+  g.pending.push(tag(`set ${name} = namespace(value=none)`)+tag(`if ${condition.code}`)+yes.pending+tag(`set ${name}.value = ${yes.code}`)+tag('else')+no.pending+tag(`set ${name}.value = ${no.code}`)+tag('endif'));
+  return expr(`${name}.value`);
+};
 f.math_arithmetic = (b,g) => expr(`${group(b,g,'A','0')} ${{ADD:'+',MINUS:'-',MULTIPLY:'*',DIVIDE:'/',POWER:'**'}[b.getFieldValue('OP')]} ${group(b,g,'B','0')}`);
 f.math_modulo = (b,g) => expr(`${group(b,g,'DIVIDEND','0')} % ${group(b,g,'DIVISOR','1')}`);
 f.math_round = (b,g) => expr(`${group(b,g,'NUM','0')} | round(${b.getFieldValue('PRECISION')}, '${{ROUND:'common',ROUNDUP:'ceil',ROUNDDOWN:'floor'}[b.getFieldValue('OP')]}')`);
@@ -89,7 +132,7 @@ f.tb_filter = (b,g) => {
   const name=b.getFieldValue('FILTER').trim();
   if(!/^[a-zA-Z_]\w*$/.test(name))throw new Error('Filter names must be identifiers.');
   const args=b.getFieldValue('ARGS').trim();
-  return expr(`${group(b,g,'VALUE')} | ${name}${args ? `(${args})` : ''}`);
+  return expr(`${group(b,g,'VALUE')} | ${name}${args ? `(${args})` : ''}${lazyFilters.has(name)?' | list':''}`);
 };
 f.tb_test = (b,g) => {
   const name=b.getFieldValue('TEST').trim();
@@ -120,10 +163,14 @@ f.variables_get = (b,g) => expr(variable(b,g));
 f.variables_set = (b,g) => tag(`set ${variable(b,g)} = ${input(b,g,'VALUE')}`);
 f.math_change = (b,g) => tag(`set ${variable(b,g)} = (${variable(b,g)} | float(0)) + ${group(b,g,'DELTA','1')}`);
 f.controls_if = (b,g) => {
-  let code='';
-  for(let i=0;b.getInput(`IF${i}`);i++)code+=tag(`${i?'elif':'if'} ${input(b,g,`IF${i}`,'false')}`)+g.statementToCode(b,`DO${i}`);
+  let code='',count=0;
+  for(let i=0;b.getInput(`IF${i}`);i++){
+    const parent=g.pending;g.pending=[];
+    const condition=input(b,g,`IF${i}`,'false'),pending=g.pending.join('');g.pending=parent;
+    code+=(i?tag('else'):'')+pending+tag(`if ${condition}`)+g.statementToCode(b,`DO${i}`);count++;
+  }
   if(b.getInput('ELSE'))code+=tag('else')+g.statementToCode(b,'ELSE');
-  return code+tag('endif');
+  return code+tag('endif').repeat(count);
 };
 f.controls_forEach = (b,g) => {
   const name=g.nameDB_.getName(b.getFieldValue('VAR'),Blockly.Names.NameType.VARIABLE);
@@ -134,4 +181,14 @@ f.lists_create_with = (b,g) => expr(`[${Array.from({length:b.itemCount_},(_,i)=>
 f.lists_length = f.text_length = (b,g) => expr(`${group(b,g,b.type==='text_length'?'VALUE':'VALUE','[]')} | length`);
 f.lists_isEmpty = f.text_isEmpty = (b,g) => expr(`(${group(b,g,'VALUE','[]')} | length) == 0`);
 
+// Emit collection-building loops immediately before their consuming statement,
+// within the same condition/loop scope, without serializing values through JSON.
+for(const [type,handler] of Object.entries(f)){
+  f[type]=(block,g)=>{
+    if(block.outputConnection)return handler(block,g);
+    const parent=g.pending;g.pending=[];
+    try {const code=handler(block,g);return g.pending.join('')+code;}
+    finally {g.pending=parent;}
+  };
+}
 export function generate(workspace) { return jinja.workspaceToCode(workspace); }

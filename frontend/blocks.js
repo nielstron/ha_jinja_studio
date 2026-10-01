@@ -46,6 +46,11 @@ class ActionField extends Blockly.FieldTextInput {
   showEditor_() { selectField?.(this, 'action'); }
   static fromJson(options) { return new ActionField(options.text || 'weather.get_forecasts'); }
 }
+class FilterField extends Blockly.FieldTextInput {
+  showEditor_() { selectField?.(this,'filter'); }
+  getText() { return this.getValue() || 'Configure…'; }
+  static fromJson(options) { return new FilterField(options.text || ''); }
+}
 class IconField extends Blockly.FieldTextInput {
   showEditor_() { selectField?.(this, 'icon'); }
   static fromJson(options) { return new IconField(options.text || 'mdi:lightbulb'); }
@@ -59,6 +64,7 @@ Blockly.fieldRegistry.register('field_ha_state', StateField);
 Blockly.fieldRegistry.register('field_ha_attribute', AttributeField);
 Blockly.fieldRegistry.register('field_ha_response', ResponseField);
 Blockly.fieldRegistry.register('field_ha_action', ActionField);
+Blockly.fieldRegistry.register('field_jinja_filter', FilterField);
 Blockly.fieldRegistry.register('field_tb_icon', IconField);
 Blockly.fieldRegistry.register('field_tb_color', ColorField);
 
@@ -83,7 +89,10 @@ Blockly.defineBlocksWithJsonArray([
   statement('tb_literal', 'write text %1', [text('TEXT','Hello')], 25, 'Literal text: spaces and newlines are preserved, including any Jinja-looking text.'),
   expression('tb_icon','icon %1',[{type:'field_tb_icon',name:'ICON',text:'mdi:lightbulb'}],25,'Select a Material Design Icon. Outputs an mdi:… string for an icon template; works in conditions and variables too.'),
   expression('tb_color','color %1 as %2',[{type:'field_tb_color',name:'COLOR',text:'#ff9800'},dropdown('FORMAT',[['hex color','hex'],['RGB list','rgb']])],25,'Pick a color. Outputs a hex string or an RGB list. Whether a destination accepts color templates depends on its integration/card.'),
-  expression('tb_filter', '%1 → filter %2 arguments %3', [value('VALUE'),text('FILTER','round'),text('ARGS','')], 270, 'Any Jinja or Home Assistant filter. Arguments are Jinja expressions, e.g. 2 or ", ". Chain filters by connecting blocks.'),
+  expression('tb_filter', '%1 → %2 options %3', [value('VALUE'),{type:'field_jinja_filter',name:'FILTER',text:'round'},{type:'field_jinja_filter',name:'ARGS',text:''}], 270, 'Click the filter name or options to choose a filter and configure its named arguments. Inside map/filter, an empty value input uses the current item.'),
+  {type:'tb_map',message0:'map list %1',args0:[value('LIST')],message1:'using operation %1',args1:[value('OP')],output:null,colour:160,inputsInline:false,tooltip:'Apply the operation to each item. Reuse attribute, maths, string or any expression block. An empty unary value input means current item.'},
+  {type:'tb_filter_list',message0:'filter list %1',args0:[value('LIST')],message1:'keep item when %1',args1:[value('PREDICATE')],output:null,colour:160,inputsInline:false,tooltip:'Keep items for which the predicate is true. Compose tests, comparisons and boolean logic using current item.'},
+  expression('tb_item','current item',[],160,'The current item inside the nearest map/filter operation. Use explicitly in comparisons or other multi-input operations.'),
   expression('tb_test', '%1 is %2 arguments %3', [value('VALUE'),text('TEST','number'),text('ARGS','')], 210, 'Any Jinja test, such as defined, number, string, iterable, equalto or match.'),
   expression('tb_call', 'call %1 with arguments %2', [text('FUNCTION','range'),value('ARGS')], 270, 'Pass a list of arguments. Supports Jinja globals and Home Assistant functions such as range, dict, expand, area_entities or as_timestamp.'),
   expression('tb_property', '%1 property / key %2', [value('VALUE'),text('KEY','state')], 160),
@@ -118,7 +127,7 @@ export const toolbox = {
     {kind:'category',name:'Logic',colour:'#597fc0',contents:['controls_if','logic_compare','logic_operation','logic_negate','logic_boolean','logic_null','logic_ternary','tb_contains','tb_test'].map(block)},
     {kind:'category',name:'Loops',colour:'#66a154',contents:['controls_forEach','tb_range','tb_loop_info'].map(block)},
     {kind:'category',name:'Maths',colour:'#667cc4',contents:['math_number','math_arithmetic','math_single','math_round','math_modulo','math_constrain','math_constant','math_trig','math_on_list','math_number_property'].map(block)},
-    {kind:'category',name:'Text & lists',colour:'#409a79',contents:['text','tb_concat','tb_replace','tb_split','tb_join','text_length','text_isEmpty','lists_create_with','lists_length','lists_isEmpty','tb_index','tb_slice','tb_property','tb_pair','tb_dict'].map(block)},
+    {kind:'category',name:'Text & lists',colour:'#409a79',contents:['tb_map','tb_filter_list','tb_item','text','tb_concat','tb_replace','tb_split','tb_join','text_length','text_isEmpty','lists_create_with','lists_length','lists_isEmpty','tb_index','tb_slice','tb_property','tb_pair','tb_dict'].map(block)},
     {kind:'category',name:'Variables',colour:'#a45b9b',custom:'VARIABLE'},
     {kind:'category',name:'Jinja & filters',colour:'#9365ba',contents:[
       {kind:'label',text:'Connect filters into a chain'},

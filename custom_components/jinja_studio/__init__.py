@@ -5,11 +5,15 @@ from pathlib import Path
 import voluptuous as vol
 from homeassistant.components import frontend, panel_custom, websocket_api
 from homeassistant.components.http import StaticPathConfig
+from homeassistant.core import callback
 from homeassistant.helpers.storage import Store
+from homeassistant.helpers.template import TemplateEnvironment
+
+from .filter_catalog import describe_filters
 
 DOMAIN = "jinja_studio"
 PANEL = "jinja-studio"
-MODULE_URL = "/jinja_studio_static/tools-tab.js?v=0.1.1"
+MODULE_URL = "/jinja_studio_static/tools-tab.js?v=0.1.2"
 
 
 async def async_setup_entry(hass, entry):
@@ -30,13 +34,14 @@ async def async_setup_entry(hass, entry):
             ]
         )
         websocket_api.async_register_command(hass, websocket_projects)
+        websocket_api.async_register_command(hass, websocket_filters)
     await panel_custom.async_register_panel(
         hass,
         PANEL,
         "jinja-studio-panel",
         sidebar_title=None,
         sidebar_icon="mdi:puzzle-outline",
-        module_url="/jinja_studio_static/panel.js?v=0.1.1",
+        module_url="/jinja_studio_static/panel.js?v=0.1.2",
         require_admin=True,
     )
     frontend.add_extra_js_url(hass, MODULE_URL)
@@ -76,3 +81,11 @@ async def websocket_projects(hass, connection, msg):
         del projects[msg["project_id"]]
         await data["store"].async_save(projects)
     connection.send_result(msg["id"], projects)
+
+
+@websocket_api.websocket_command({vol.Required("type"): "jinja_studio/filters"})
+@websocket_api.require_admin
+@callback
+def websocket_filters(hass, connection, msg):
+    """List available filters and their argument signatures."""
+    connection.send_result(msg["id"], describe_filters(TemplateEnvironment(hass)))

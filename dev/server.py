@@ -4,6 +4,7 @@ import asyncio
 import json
 import math
 import re
+import runpy
 import statistics
 import subprocess
 from datetime import UTC, datetime
@@ -15,6 +16,9 @@ from jinja2 import StrictUndefined
 from jinja2.sandbox import ImmutableSandboxedEnvironment
 
 ROOT = Path(__file__).resolve().parents[1]
+describe_filters = runpy.run_path(
+    ROOT / "custom_components/jinja_studio/filter_catalog.py"
+)["describe_filters"]
 
 
 class States:
@@ -201,6 +205,10 @@ async def projects(request):
     return web.json_response(data)
 
 
+async def filters(request):
+    return web.json_response(describe_filters(environment({"states": []})))
+
+
 def fetch_forecast(message):
     """Only allow read-only weather forecasts through the local SSH bridge."""
     if message["domain"] != "weather" or message["service"] != "get_forecasts":
@@ -262,6 +270,7 @@ app.router.add_get("/", index)
 app.router.add_get("/api/states", snapshot)
 app.router.add_get("/api/demo", demo)
 app.router.add_get("/api/services", services)
+app.router.add_get("/api/filters", filters)
 app.router.add_post("/api/render", render)
 app.router.add_post("/api/projects", projects)
 app.router.add_post("/api/action-sample", action_sample)
