@@ -188,7 +188,7 @@ class TemplateBuilderPanel extends HTMLElement {
   async save() {
     if(this.template===null){this.toast('Fix the block error before saving.');return;}
     const name=this.$('name').value.trim();if(!name){this.toast('Give the template a name.');this.$('name').focus();return;}
-    const id=this.projectId||crypto.randomUUID();
+    const id=this.projectId||Blockly.utils.idGenerator.genUid();
     try{this.projects=await this.hass.callWS({type:'jinja_studio/projects',action:'save',project_id:id,project:{name,workspace:Blockly.serialization.workspaces.save(this.workspace),template:this.template}});this.projectId=id;this.dirty=false;this.$('saved').textContent='Saved';this.renderProjects();this.writeDraft();this.toast('Template saved');}
     catch(e){this.toast(`Could not save: ${e.message||e}`);}
   }

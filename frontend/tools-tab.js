@@ -2,7 +2,7 @@
 // here; the independently registered /jinja-studio panel is the fallback.
 export const STUDIO_PAGE='jinja-studio';
 const patched=Symbol.for('jinja_studio.tools_tab');
-const route={tag:'jinja-studio-panel',load:()=>import('/jinja_studio_static/panel.js?v=0.1.1')};
+const route={tag:'jinja-studio-panel',load:()=>import('/jinja_studio_static/panel.js?v=0.1.2')};
 
 export function registerStudioRoute(router) {
   if(!router.routerOptions?.routes)return false;
